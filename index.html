@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelvin-Helmholtz Wave Simulator - Particle Vector Field</title>
+    <!-- 引入 MathJax 用于渲染标准数学公式 -->
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px;
+        }
+        
+        h1 {
+            font-size: 2.2rem;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            color: #38bdf8;
+            text-align: center;
+        }
+        
+        /* 简介文字框 */
+        .subtitle-container {
+            max-width: 1200px;
+            width: 100%;
+            text-align: center;
+            margin-top: 12px;
+            margin-bottom: 35px; 
+            background: transparent;
+            border: none;
+            padding: 0;
+            font-size: 0.95rem;
+            color: #94a3b8;
+            line-height: 1.3;
+            min-height: 75px;
+        }
+        .subtitle-container strong {
+            color: #e2e8f0;
+        }
+        .formula-box {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 2px 10px;
+            background: transparent;
+            color: #e2e8f0;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            max-width: 1050px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* 左侧面板 */
+        .panel-left {
+            flex: 1.4;
+            min-width: 320px;
+            background: transparent;
+            border-radius: 0;
+            border: none;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .canvas-container {
+            position: relative;
+            background: transparent;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #334155;
+            flex: 1;
+            min-height: 380px;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Dashboard 悬浮信息 */
+        .dashboard {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: transparent;
+            padding: 0;
+            border: none;
+            backdrop-filter: none;
+            z-index: 10;
+        }
+        .ri-badge {
+            font-size: 1.2rem;
+            font-weight: normal;
+        }
+        .unstable { color: #f87171; }
+        .stable { color: #4ade80; }
+
+        /* 右侧面板 */
+        .panel-right {
+            flex: 1;
+            min-width: 300px;
+            background: transparent;
+            border-radius: 0;
+            border: none;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        /* 滑块与按钮组 */
+        .controls-list {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            margin-top: 35px;
+        }
+        .param-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .param-group label {
+            font-size: 0.9rem;
+            color: #cbd5e1;
+            display: flex;
+            justify-content: space-between;
+        }
+        input[type=range] {
+            width: 100%;
+            accent-color: #38bdf8;
+            cursor: pointer;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 15px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #38bdf8;
+            color: #0f172a;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        button:hover {
+            background: #7dd3fc;
+        }
+        /* Pause 状态样式 */
+        button.pause-state {
+            background: #475569;
+            color: #f8fafc;
+        }
+        button.pause-state:hover {
+            background: #64748b;
+        }
+        /* Reset 按钮样式 */
+        button.reset-btn {
+            background: #334155;
+            color: #f8fafc;
+        }
+        button.reset-btn:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Kelvin-Helmholtz Wave Simulator</h1>
+
+    <!-- 副标题与公式计算说明 -->
+    <div class="subtitle-container">
+        The Richardson Number (Ri) is a dimensionless ratio of buoyant suppression of turbulence to shear generation of turbulence.
+        <br>
+        It can be defined as:
+        <div class="formula-box">
+            $$\mathbfit{Ri} = \frac{\mathbfit{N}^2}{\mathbfit{S}^2} = \frac{\mathbfit{N}^2}{(\boldsymbol{\Delta} \mathbfit{u}/\boldsymbol{\Delta} \mathbfit{z})^2}$$
+        </div>
+        <br>
+        Instability between fluid layers occurs when <strong>Ri &lt; 0.25</strong>
+    </div>
+
+    <div class="container">
+        <!-- 左框：Canvas & Dashboard -->
+        <div class="panel-left">
+            <div class="canvas-container">
+                <canvas id="simCanvas" width="600" height="380"></canvas>
+                <div class="dashboard">
+                    <div>Richardson Number (Ri): <span id="riVal" class="ri-badge unstable">0.12</span></div>
+                    <div id="statusText" style="font-size: 0.8rem; margin-top: 4px; color: #f87171;">
+                        KH Wave Formed (Ri &lt; 0.25)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右框：控制面板 -->
+        <div class="panel-right">
+            <div class="controls-list">
+                <div class="param-group">
+                    <label>Perturbation Amplitude: <span id="ampVal">15</span></label>
+                    <input type="range" class="param-slider" id="ampInput" min="5" max="35" value="15">
+                </div>
+
+                <div class="param-group">
+                    <label>Velocity Difference (Δu): <span id="duVal">25 m/s</span></label>
+                    <input type="range" class="param-slider" id="duInput" min="5" max="50" value="25">
+                </div>
+
+                <div class="param-group">
+                    <label>Buoyancy Frequency Squared (N²): <span><span id="n2Val">0.0005</span> s<sup>-2</sup></span></label>
+                    <input type="range" class="param-slider" id="n2Input" min="0.0001" max="0.003" step="0.0001" value="0.0005">
+                </div>
+
+                <div class="param-group">
+                    <label>Shear Layer Thickness (Δz): <span id="dzVal">120 m</span></label>
+                    <input type="range" class="param-slider" id="dzInput" min="50" max="250" value="120">
+                </div>
+
+                <div class="btn-group">
+                    <!-- 合并后的 Start/Pause 主控按钮 -->
+                    <button id="toggleBtn">Start</button>
+                    <!-- 新增的 Reset 按钮 -->
+                    <button id="resetBtn" class="reset-btn">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const sliders = document.querySelectorAll('.param-slider');
+        const duInput = document.getElementById('duInput');
+        const n2Input = document.getElementById('n2Input');
+        const ampInput = document.getElementById('ampInput');
+        const dzInput = document.getElementById('dzInput');
+
+        const duVal = document.getElementById('duVal');
+        const n2Val = document.getElementById('n2Val');
+        const ampVal = document.getElementById('ampVal');
+        const dzVal = document.getElementById('dzVal');
+
+        const riVal = document.getElementById('riVal');
+        const statusText = document.getElementById('statusText');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const resetBtn = document.getElementById('resetBtn');
+
+        let isRunning = false;
+        let particles = [];
+        let vortices = [];
+        const numParticles = 800;
+
+        function getRi() {
+            const du = parseFloat(duInput.value);
+            const dz = parseFloat(dzInput.value);
+            const n2 = parseFloat(n2Input.value);
+            const shear = du / dz;
+            return n2 / (shear * shear);
+        }
+
+        function initVortices() {
+            vortices = [];
+            const spacing = 200;
+            const centerY = canvas.height / 2;
+
+            for (let x = 100; x < canvas.width + spacing; x += spacing) {
+                vortices.push({
+                    x: x,
+                    y: centerY,
+                    currentStrength: 0
+                });
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < numParticles; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: canvas.height / 2 + (Math.random() - 0.5) * 40,
+                    size: Math.random() * 2 + 1,
+                    alpha: Math.random() * 0.6 + 0.3
+                });
+            }
+        }
+
+        function updateUI() {
+            duVal.innerText = `${duInput.value} m/s`;
+            n2Val.innerText = `${n2Input.value}`;
+            ampVal.innerText = `${ampInput.value}`;
+            dzVal.innerText = `${dzInput.value} m`;
+
+            const ri = getRi();
+            riVal.innerText = ri.toFixed(2);
+
+            if (ri < 0.25) {
+                riVal.className = "ri-badge unstable";
+                statusText.innerText = "KH Wave Formed (Ri < 0.25)";
+                statusText.style.color = "#f87171";
+            } else {
+                riVal.className = "ri-badge stable";
+                statusText.innerText = "No Wave Formation (Ri ≥ 0.25)";
+                statusText.style.color = "#4ade80";
+            }
+
+            // 更新播放/暂停按钮的外观和文本
+            if (isRunning) {
+                toggleBtn.innerText = "Pause";
+                toggleBtn.className = "pause-state";
+            } else {
+                toggleBtn.innerText = "Start";
+                toggleBtn.className = "";
+            }
+
+            sliders.forEach(slider => {
+                slider.disabled = isRunning;
+            });
+        }
+
+        /* 恢复粒子与涡旋到初始状态 */
+        function resetAnimationState() {
+            initVortices();
+            initParticles();
+        }
+
+        function updatePhysics() {
+            const du = parseFloat(duInput.value);
+            const dz = parseFloat(dzInput.value);
+            const n2 = parseFloat(n2Input.value);
+            const maxCirculation = parseFloat(ampInput.value) * 120;
+            const ri = getRi();
+            const shear = du / dz;
+
+            vortices.forEach(v => {
+                v.x += du * 0.03;
+                if (v.x > canvas.width + 100) {
+                    v.x -= canvas.width + 200;
+                }
+
+                if (ri < 0.25) {
+                    const growthRate = shear * Math.sqrt(0.25 - ri) * 0.05;
+                    v.currentStrength += (maxCirculation - v.currentStrength) * growthRate;
+                } else {
+                    v.currentStrength *= 0.95;
+                }
+            });
+
+            particles.forEach(p => {
+                const centerY = canvas.height / 2;
+                const distFromCenter = p.y - centerY;
+
+                const u_wind = (du * 0.04) * Math.tanh(distFromCenter / (dz * 0.2)) + (du * 0.02);
+
+                let u_vortex = 0;
+                let v_vortex = 0;
+
+                const buoyancySuppression = 1 / (1 + n2 * 1500);
+
+                vortices.forEach(v => {
+                    const dx = p.x - v.x;
+                    const dy = p.y - v.y;
+                    const r2 = dx * dx + dy * dy + 400;
+                    const r = Math.sqrt(r2);
+
+                    const v_theta = v.currentStrength / r2;
+
+                    u_vortex += -v_theta * (dy / r);
+                    v_vortex += (v_theta * (dx / r)) * buoyancySuppression;
+                });
+
+                p.x += u_wind + u_vortex;
+                p.y += v_vortex;
+
+                if (p.x > canvas.width) p.x -= canvas.width;
+                if (p.x < 0) p.x += canvas.width;
+
+                if (p.y < 20 || p.y > canvas.height - 20) {
+                    p.y = centerY + (Math.random() - 0.5) * 30;
+                }
+            });
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.beginPath();
+            ctx.setLineDash([6, 6]);
+            ctx.strokeStyle = 'rgba(71, 85, 105, 0.5)';
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            particles.forEach(p => {
+                ctx.fillStyle = `rgba(56, 189, 248, ${p.alpha})`;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            if (isRunning) {
+                updatePhysics();
+            }
+
+            requestAnimationFrame(render);
+        }
+
+        sliders.forEach(slider => {
+            slider.addEventListener('input', () => {
+                if (isRunning) {
+                    isRunning = false;
+                }
+                resetAnimationState();
+                updateUI();
+            });
+        });
+
+        // Toggle 按钮逻辑（合并后的 Start/Pause）
+        toggleBtn.addEventListener('click', () => {
+            isRunning = !isRunning;
+            updateUI();
+        });
+
+        // Reset 按钮逻辑（重置动画但不修改播放状态与用户参数）
+        resetBtn.addEventListener('click', () => {
+            resetAnimationState();
+        });
+
+        // 初始化
+        resetAnimationState();
+        updateUI();
+        render();
+    </script>
+</body>
+</html>
